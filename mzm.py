@@ -16,13 +16,14 @@ plt.rcParams['font.size'] = '16'
 # MZM values.
 Vpi = 1           # Voltage (V) corresponding to a shift of Pi on the output phase.
 bias = (3*Vpi)/2  # DC bias (V), placed at Quad+ point by default.
-drift = 0.1      # Drift (V). # NOTE: Change this to see the effect on the output.
+drift = 0.1       # Drift (V). # NOTE: Change this to see the effect on the output.
 alpha = 1         # Insertion loss coefficient.
 
-# Input signal frequency.
-signal_frequency = 0.050 # MHz # NOTE: For correct phase estimation, frequency must be on a bin center!
-signal_period = 1/signal_frequency # ns.
-signal_intensity = 0.25 # V # NOTE: Must be small enough to stay within linear zone.
+# Input signal frequency. This signal can be considered as pilot tone when estimating bias drift.
+# NOTE: This normally operates at much lower frequencies of the data signal, so that they do not interfere.
+signal_frequency = 0.050            # MHz # NOTE: For correct phase estimation, frequency must be on a bin center!
+signal_period = 1/signal_frequency  # ns.
+signal_intensity = 0.25             # V # NOTE: Must be small enough to stay within linear zone when there is not drift.
 
 # ADC sample rate.
 sampleRate = 0.512 # MHz
