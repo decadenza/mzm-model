@@ -11,14 +11,13 @@ import utils
 plt.rcParams['font.size'] = '16'
 
 # SECTION Configuration.
+# NOTE: These value can be changed to reproduce different situations. This is just a demo.
 
 # MZM values.
 Vpi = 1           # Voltage (V) corresponding to a shift of Pi on the output phase.
 bias = (3*Vpi)/2  # DC bias (V), placed at Quad+ point by default.
-drift = 0.00      # Drift (V). # NOTE: Change this to see the effect on the output.
-
-# Insertion loss coefficient.
-alpha = 1
+drift = 0.1      # Drift (V). # NOTE: Change this to see the effect on the output.
+alpha = 1         # Insertion loss coefficient.
 
 # Input signal frequency.
 signal_frequency = 0.050 # MHz # NOTE: For correct phase estimation, frequency must be on a bin center!
@@ -93,16 +92,76 @@ if __name__ == '__main__':
     bin_size = sampleRate / num_samples # MHz. The width of each bin is the sampling frequency divided by the number of samples in your FFT.
     print(f"Frequency bin resolution: {1e6*bin_size:0.2f} Hz")
 
-    # NOTE: The frequency is the center of the bin (so we must round to actually include the wanted frequency).
+    frequencies_are_centered = True
+
     # SECTION First harmonic energy
     bin1 = round(signal_frequency / bin_size)
     if bin1 != signal_frequency / bin_size:
+        frequencies_are_centered = False
         print(f"WARNING: The 1st harmonic is not centered in a bin.")
 
     print(f"Fundamental frequency expected at: {signal_frequency*1e6} Hz")
     print(f"Bin containing fundamental frequency is centered at: {freqs[bin1]*1e6} Hz")
     
+    # Identify three points as (frequency, Log|FFT|) coordinates.
+    points1 = np.array([
+        [freqs[bin1-1], S_abs[bin1-1]], 
+        [freqs[bin1], S_abs[bin1]], 
+        [freqs[bin1+1], S_abs[bin1+1]]
+        ])
     
+    freq1, freq1_fft_abs = utils.parabola_estimate_peak(points1)    
+    print(f"Fundamental peak found at: ({freq1}, {freq1_fft_abs}) (error_x: {abs(freq1-signal_frequency)})")
+    # !SECTION
+
+    # SECTION Second harmonic energy
+    # If zero is expected, results will be affected by noise.
+    bin2 = round(2*freq1 / bin_size)
+    if bin2 != 2*signal_frequency / bin_size:
+        frequencies_are_centered = False
+        print(f"WARNING: The 2nd harmonic is not centered in the bin.")
+
+    print(f"Second harmonic frequency expected at: {2*signal_frequency*1e6} Hz")
+    print(f"Bin containing second harmonic is centered at: {freqs[bin2]*1e6} Hz")
+    
+    points2 = np.array([
+        [freqs[bin2-1], S_abs[bin2-1]], 
+        [freqs[bin2], S_abs[bin2]], 
+        [freqs[bin2+1], S_abs[bin2+1]]
+        ])
+
+    freq2, freq2_fft_abs = utils.parabola_estimate_peak(points2)    
+    print(f"Second harmonic peak found at: ({freq2}, {freq2_fft_abs}) (error_x: {abs(freq2-2*signal_frequency)})")
+    # !SECTION
+    
+    # SECTION Showing ratio as indication of drift.
+    print(f"Original bias drift: {drift}")
+    # Inspired by (J. Svarny, 2014) paper.
+    print(f"DRIFT MAGNITUDE (ratio 2nd/1st harmonic): {freq2_fft_abs/freq1_fft_abs}")
+
+    # SECTION Relative shift calculation.
+    # NOTE: This approach will not work if frequencies are not centered in the bins!!!
+    if not frequencies_are_centered:
+        print("WARNING: Cannot estimate drift sign, as frequencies are not centered in a bin!")
+    else:    
+        # NOTE: Do not use the formula below, to avoid arctan2 singularities! 
+        #phaseDiff = S_arg[bin2]-2*S_arg[bin1]
+        # Do the operation in complex domain first, then extract phase!
+        diffValue = S[bin2]*np.conjugate(S[bin1]**2)
+        phaseDiff = np.angle(diffValue) # Will be between (-pi, pi].
+        print(f"Difference angle: {phaseDiff} (angular velocity {phaseDiff/(2*np.pi)})")
+
+        if (np.abs(phaseDiff) < np.pi/2 and drift>0):
+            # Drift direction is found!
+            print(f"DRIFT DIRECTION: MATCHED +")
+        elif (np.abs(phaseDiff) > np.pi/2 and drift<0):
+            # Drift direction is found!
+            print(f"DRIFT DIRECTION: MATCHED -")
+        else:
+            # No measurable drift direction.
+            print("DRIFT DIRECTION: NOT FOUND")
+
+    # !SECTION
     
     ### Show the time graph ###
     figTime, ax = plt.subplots(nrows=3, ncols=1)
@@ -122,7 +181,7 @@ if __name__ == '__main__':
     ax[1].set_ylabel('Power')
 
     ax[2].title.set_text('MZM output')
-    ax[2].plot(t[:num_samplesPerPeriod], mzmOut[:num_samplesPerPeriod], linestyle='-', color='blue')
+    ax[2].plot(t[:num_samplesPerPeriod], mzmOut[:num_samplesPerPeriod], linestyle='-', color='purple')
     ax[2].set_ylabel('Power')
 
     plt.subplots_adjust(hspace=0.5, wspace=0.2)
@@ -134,7 +193,9 @@ if __name__ == '__main__':
     figFreq.suptitle("FFT")
 
     axFreq[0].title.set_text('Log(|FFT|)')
-    axFreq[0].plot(freqs[:maxF], S_abs_Log[:maxF], linestyle='-', color='purple')
+    axFreq[0].plot(freqs[:maxF], S_abs_Log[:maxF], linestyle='-', color='blue')
+    axFreq[0].axvline(freq1, linestyle='--', color='red')
+    axFreq[0].axvline(freq2, linestyle='--', color='red')
     axFreq[0].set_ylabel('')
 
     axFreq[1].title.set_text('arg(FFT)')
