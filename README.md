@@ -18,3 +18,7 @@ source ./venv/bin/activate
 pip install -r requirements.txt
 python mzm.py
 ```
+
+## References
+- Švarný, J. "Analysis of quadrature bias-point drift of Mach-Zehnder electro-optic modulator." 2010 12th Biennial Baltic Electronics Conference. IEEE, 2010.
+- Svarny, J. "Bias driver of the Mach-Zehnder intensity electro-optic modulator, based on harmonic analysis." Advances in robotics, mechatronics and circuits 6 (2014): 184-189.
